@@ -3,6 +3,7 @@ package com.mystore.app.service;
 import com.mystore.app.entity.Product;
 import com.mystore.app.repositories.ProductRepository;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.data.domain.*;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
@@ -16,49 +17,66 @@ public class ProductService {
     @Autowired
     private ProductRepository productRepository;
 
+    // CREATE
     public Product addProduct(Product product) {
         product.setId(currentId++);
-        productRepository.save(product);
-        return product;
+        return productRepository.save(product);
     }
 
-    public List<Product> getAllProducts() {
-        return productRepository.findAll();
+
+    public Page<Product> getAllProducts(int page, int pageSize, String sortBy, String sortDir) {
+        Sort sort = sortDir.equalsIgnoreCase("desc")
+                ? Sort.by(sortBy).descending()
+                : Sort.by(sortBy).ascending();
+
+        Pageable pageable = PageRequest.of(page, pageSize, sort);
+        return productRepository.findAll(pageable);
     }
 
+    // GET by ID
     public Product getProduct(Integer id) {
-        Optional<Product> productOptional = productRepository.findById(id);
-        return productOptional.get();
+        Optional<Product> optional = productRepository.findById(id);
+        return optional.orElse(null);
     }
 
+    // UPDATE
     public Product updateProduct(Integer id, Product product) {
-        Product p = productRepository.findById(id).get();
-        if (p == null) return null;
-        p.setName(product.getName());
-        p.setPrice(product.getPrice());
-        p.setCategory(product.getCategory());
-        p.setStockQuantity(product.getStockQuantity());
-        productRepository.save(p);
-        return p;
+        Optional<Product> optional = productRepository.findById(id);
+        if (optional.isEmpty()) {
+            return null;  // Will let controller produce 404 if null
+        }
+        Product existing = optional.get();
+        existing.setName(product.getName());
+        existing.setCategory(product.getCategory());
+        existing.setPrice(product.getPrice());
+        existing.setStockQuantity(product.getStockQuantity());
+        return productRepository.save(existing);
     }
 
-    public String deleteProduct(Integer id) {
-        Product p = productRepository.findById(id).get();
-        if (p == null) return "Product Not Found";
-        productRepository.delete(p);
-        return "Product Deleted Successfully";
+    // DELETE
+    public boolean deleteProduct(Integer id) {
+        Optional<Product> optional = productRepository.findById(id);
+        if (optional.isEmpty()) {
+            return false;
+        }
+        productRepository.delete(optional.get());
+        return true;
     }
 
-    // TODO: Method to search products by name
 
+    public List<Product> searchProductsByName(String name) {
+        return productRepository.findByNameContainingIgnoreCase(name);
+    }
 
-    // TODO: Method to filter products by category
+    public List<Product> filterByCategory(String category) {
+        return productRepository.findByCategoryIgnoreCase(category);
+    }
 
+    public List<Product> filterByPriceRange(Double minPrice, Double maxPrice) {
+        return productRepository.findByPriceBetween(minPrice, maxPrice);
+    }
 
-    // TODO: Method to filter products by price range
-
-
-    // TODO: Method to filter products by stock quantity range
-
-
+    public List<Product> filterByStockRange(Integer minStock, Integer maxStock) {
+        return productRepository.findByStockQuantityBetween(minStock, maxStock);
+    }
 }
